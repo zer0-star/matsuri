@@ -137,7 +137,7 @@ of Nothing():
 
 ## Examples
 
-For more examples, see [examples](https://github.com/zer0-star/matsuri/examples/).
+For more examples, see [examples](https://github.com/zer0-star/matsuri/tree/master/examples).
 
 ## Future Work
 
