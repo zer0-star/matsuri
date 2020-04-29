@@ -1,0 +1,26 @@
+version: 2.1
+jobs:
+  build:
+    docker:
+      - image: nimlang/nim
+    steps:
+      - run: echo 'export PATH=~/.nimble/bin:$PATH' >> $BASH_ENV
+      - checkout
+      # Reuse cached directories
+      - restore_cache:
+          key: nim-0000
+      - run:
+          command: |
+            # Example: adding OS libraries
+            apt-get update
+            apt-get install -y --no-install-recommends libsodium23
+      - save_cache:
+          key: nim-0000
+          paths:
+            - .nimble
+      - run: nimble test
+      - store_artifacts:
+          path: test-reports/
+          destination: tr1
+      - store_test_results:
+          path: test-reports/
