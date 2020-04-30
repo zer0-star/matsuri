@@ -2,6 +2,9 @@
 
 # Matsuri: Useful Variant Type and Powerful Pattern Matching
 
+[![CircleCI](https://circleci.com/gh/zer0-star/matsuri.svg?style=shield)](https://circleci.com/gh/zer0-star/matsuri)
+[![nimble](https://raw.githubusercontent.com/yglukhov/nimble-tag/master/nimble_js.png)](https://github.com/yglukhov/nimble-tag)
+
 Matsuri is a library providing variant types and pattern matching inspired by [Patty](https://github.com/andreaferretti/patty).
 
 Matsuri's pattern matching system is unique. The key of this is the macro `customMatcher`.
@@ -81,11 +84,11 @@ proc Just(x: int): Maybe =
 proc Nothing(): Maybe =
   result = Maybe(kind: MaybeKind.Nothing)
 
-proc `$`(val`gensym142058: Maybe): string =
-  result = $val`gensym142058.kind & "("
-  case val`gensym142058.kind
+proc `$`(val: Maybe): string =
+  result = $val.kind & "("
+  case val.kind
   of MaybeKind.Just:
-    result &= ", x: " & $val`gensym142058.x
+    result &= ", x: " & $val.x
   of MaybeKind.Nothing:
   if result[^1] == ' ':
     result[^2..^1] = ")"
