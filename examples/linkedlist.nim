@@ -3,21 +3,21 @@ import matsuri
 proc `$`[T](x: ref T): string =
   `$`(x[])
 
-variant List:
+variant List[T]:
   Nil
-  Cons(x: int, y: ref List)
+  Cons(x: T, y: ref List[T])
 
 proc `~`[A](a: A): ref A =
   new(result)
   result[] = a
 
-proc toList(xs: seq[int]): List =
+proc toList[T](xs: seq[T]): List[T] =
   if xs.len == 0:
-    Nil()
+    Nil[T]()
   else:
     Cons(xs[0], ~toList(xs[1..^1]))
 
-proc sum(a: List): int =
+proc sum(a: List[int]): int =
   match a:
   of Cons(x, y):
     return x + sum(y[])

@@ -55,8 +55,6 @@ When you want to define your `customMatcher`, you can use the compile-time funct
 
 To define variant types, you can use the `variant` macro. It's similar to Patty's, but this one generates a `customMatcher` for the variant type.
 
-_The `variant` macro does not work with generics yet... Sorry_
-
 ```nim
 variant Maybe:
   Just(x: int)
@@ -138,19 +136,19 @@ of Nothing():
   echo "Nothing"
 ```
 
+You can also use generic variant types.
+
+```
+variant Maybe[T]:
+  Just(x: T)
+  Nothing()
+```
+
 ## Examples
 
 For more examples, see [examples](https://github.com/zer0-star/matsuri/tree/master/examples).
 
 ## Future Work
-
-- variant types with generics
-
-```nim
-variant Maybe[T]:
-  Just(x: T)
-  Nothing()
-```
 
 - select object or ref object
 
