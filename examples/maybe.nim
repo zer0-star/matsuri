@@ -2,27 +2,33 @@ import matsuri
 
 import sugar
 
-variant Maybe:
-  Just(x: int)
+variant Maybe[T]:
+  Just(x: T)
   Nothing()
 
-proc fmap(f: int -> int): Maybe -> Maybe =
-  return proc (m: Maybe): Maybe =
+proc fmap[T, U](f: T -> U): Maybe[T] -> Maybe[U] =
+  return proc (m: Maybe[T]): Maybe[U] =
     match m:
     of Just(x):
       return Just(f(x))
     of Nothing():
-      return Nothing()
+      return Nothing[U]()
 
-proc `>>=`(m: Maybe; f: int -> Maybe): Maybe =
+proc `>>=`[T, U](m: Maybe[T]; f: T -> Maybe[U]): Maybe[U] =
   match m:
   of Just(x):
     return f(x)
   of Nothing():
-    return Nothing()
+    return Nothing[U]()
 
-echo fmap(x => x+10)(Just(1))
-echo fmap(x => x+10)(Nothing())
+echo fmap((x: int) => x+10)(Just(1))
+echo fmap((x: int) => x+10)(Nothing[int]())
 
-echo Just(1) >>= (x => Just(x+10))
-echo Nothing() >>= (x => Just(x+10))
+echo Just(1) >>= ((x: int) => Just(x+10))
+echo Nothing[int]() >>= ((x: int) => Just(x+10))
+
+echo fmap((x: int) => $x & "a")(Just(1))
+echo fmap((x: int) => $x & "a")(Nothing[int]())
+
+echo Just(1) >>= ((x: int) => Just($x & "a"))
+echo Nothing[int]() >>= ((x: int) => Just($x & "a"))
