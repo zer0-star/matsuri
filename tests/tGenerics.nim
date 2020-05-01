@@ -14,10 +14,10 @@ test "stringify":
   check $Three[int, int]() == "Three()"
 
 test "type check":
-  check One(19, "a") is A[int, string]
-  check One('u', @[0.0, 1.0]) is A[char, seq[float]]
-  check Two[(int, int), string](39) is A[(int, int), string]
-  check Three[void, set[uint8]]() is A[void, set[uint8]]
+  check (One(19, "a") is A[int, string])
+  check (One('u', @[0.0, 1.0]) is A[char, seq[float]])
+  check (Two[(int, int), string](39) is A[(int, int), string])
+  check (Three[void, set[uint8]]() is A[void, set[uint8]])
 
 test "equality":
   check One(2, 2.2) == One(2, 2.2)
