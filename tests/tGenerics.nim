@@ -10,7 +10,7 @@ variant A[T, U]:
 test "stringify":
   check $One(10, 4.1) == "One(x: 10, y: 4.1)"
   check $One("abc", false) == "One(x: abc, y: false)"
-  check $Two[int, int](1) == "Two(a: int)"
+  check $Two[int, int](1) == "Two(a: 1)"
   check $Three[int, int]() == "Three()"
 
 test "type check":
