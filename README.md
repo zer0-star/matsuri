@@ -138,7 +138,7 @@ of Nothing():
 
 You can also use generic variant types.
 
-```
+```nim
 variant Maybe[T]:
   Just(x: T)
   Nothing()
