@@ -51,8 +51,8 @@ macro customMatcher*(e: tuple; o: untyped): untyped =
 
 # ========================================================================
 
-proc generateConstructor(fs: seq[NimNode]; typename,
-    enumName: NimNode): NimNode {.compileTime.} =
+proc generateConstructor(fs: seq[NimNode]; typename, enumName: NimNode;
+    isGeneric: bool; genericParams: NimNode): NimNode {.compileTime.} =
   var
     obj = nnkObjConstr.newTree(typename)
     param = nnkFormalParams.newTree(typename)
@@ -74,15 +74,15 @@ proc generateConstructor(fs: seq[NimNode]; typename,
   return nnkProcDef.newTree(
     kindName,
     newEmptyNode(),
-    newEmptyNode(),
+    if isGeneric: genericParams else: newEmptyNode(),
     param,
     newEmptyNode(),
     newEmptyNode(),
     nnkStmtList.newTree(obj)
   )
 
-proc generateFunctions(typename, enumName: NimNode; xs: seq[seq[
-    NimNode]]): NimNode {.compileTime.} =
+proc generateFunctions(typename, enumName: NimNode; xs: seq[seq[NimNode]];
+    isGeneric: bool; genericParams: NimNode): NimNode {.compileTime.} =
   let
     dollar = nnkAccQuoted.newTree(ident"$")
     equal = nnkAccQuoted.newTree(ident"==")
@@ -100,8 +100,8 @@ proc generateFunctions(typename, enumName: NimNode; xs: seq[seq[
       quote do: `enumName`.`kindName`,
       quote do: return `m`
     )
-  return quote do:
-    proc `dollar`*(val: `typename`): string =
+  let
+    dollarBody = quote do:
       for x, y in val.fieldPairs:
         when x == "kind":
           result = $y & "("
@@ -111,14 +111,49 @@ proc generateFunctions(typename, enumName: NimNode; xs: seq[seq[
         result[^2..^1] = ")"
       else:
         result.add ')'
-    proc `equal`*(`lhs`, `rhs`: `typename`): bool =
+    equalBody = quote do:
       if `lhs`.kind == `rhs`.kind:
         `cas`
       else:
         return false
+  return nnkStmtList.newTree(
+    nnkProcDef.newTree(
+      dollar,
+      newEmptyNode(),
+      if isGeneric: genericParams else: newEmptyNode(),
+      nnkFormalParams.newTree(
+        ident"string",
+        nnkIdentDefs.newTree(
+          ident"val",
+          typename,
+          newEmptyNode()
+    )
+  ),
+      newEmptyNode(),
+      newEmptyNode(),
+      dollarBody
+    ),
+    nnkProcDef.newTree(
+      equal,
+      newEmptyNode(),
+      if isGeneric: genericParams else: newEmptyNode(),
+      nnkFormalParams.newTree(
+        ident"bool",
+        nnkIdentDefs.newTree(
+          lhs,
+          rhs,
+          typename,
+          newEmptyNode()
+      )
+    ),
+      newEmptyNode(),
+      newEmptyNode(),
+      equalBody
+    )
+  )
 
-proc generateMatcher(xs: seq[seq[NimNode]]; typename,
-    enumName: NimNode): NimNode {.compileTime.} =
+proc generateMatcher(xs: seq[seq[NimNode]]; enumName: NimNode;
+    typeStr: string): NimNode {.compileTime.} =
   let
     left = genSym(nskParam, "left")
     right = genSym(nskParam, "right")
@@ -156,7 +191,7 @@ proc generateMatcher(xs: seq[seq[NimNode]]; typename,
       ident"untyped",
       nnkIdentDefs.newTree(
         left,
-        typename,
+        ident(typeStr),
         newEmptyNode()
     ),
     nnkIdentDefs.newTree(
@@ -172,10 +207,31 @@ proc generateMatcher(xs: seq[seq[NimNode]]; typename,
 
 
 macro variant*(typename, body: untyped): untyped =
-  typename.expectKind(nnkIdent)
+  var
+    isGeneric: bool
+    genericParams = nnkGenericParams.newTree(nnkIdentDefs.newTree())
+    typeStr: string
+    # typename = typename
+  typename.expectKind({nnkBracketExpr, nnkIdent})
+  case typename.kind
+  of nnkIdent:
+    isGeneric = false
+    typeStr = typename.strVal
+  of nnkBracketExpr:
+    typename.expectMinLen(2)
+    isGeneric = true
+    for i in 1 ..< typename.len:
+      typename[i].expectKind(nnkIdent)
+      genericParams[0].add typename[i]
+    genericParams[0].add newEmptyNode()
+    genericParams[0].add newEmptyNode()
+    typeStr = typename[0].strVal
+    # typename = typename[0]
+  else:
+    discard
   body.expectKind(nnkStmtList)
   let
-    enumName = ident(typename.strVal & "Kind")
+    enumName = ident(typeStr & "Kind")
   var
     kinds: seq[NimNode]
     field = nnkRecCase.newTree()
@@ -223,8 +279,8 @@ macro variant*(typename, body: untyped): untyped =
   result = nnkStmtList.newTree()
   result.add newEnum(enumName, kinds, false, true)
   result.add nnkTypeSection.newTree nnkTypeDef.newTree(
-    typename,
-    newEmptyNode(),
+    ident(typeStr),
+    if isGeneric: genericParams else: newEmptyNode(),
     nnkObjectTy.newTree(
       newEmptyNode(),
       newEmptyNode(),
@@ -232,7 +288,8 @@ macro variant*(typename, body: untyped): untyped =
     )
   )
   for fs in xs:
-    result.add generateConstructor(fs, typename, enumName)
-  result.add generateFunctions(typename, enumName, xs)
-  result.add generateMatcher(xs, typename, enumName)
+    result.add generateConstructor(fs, typename, enumName, isGeneric, genericParams)
+  result.add generateFunctions(typename, enumName, xs, isGeneric, genericParams)
+  result.add generateMatcher(xs, enumName, typeStr)
+  result = result.copy
   # echo result.repr
