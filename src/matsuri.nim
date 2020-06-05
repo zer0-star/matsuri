@@ -51,8 +51,11 @@ macro customMatcher*(e: tuple; o: untyped): untyped =
 
 # ========================================================================
 
-proc generateConstructor(fs: seq[NimNode]; typename, enumName: NimNode;
-    isGeneric: bool; genericParams: NimNode): NimNode {.compileTime.} =
+proc generateConstructor(fs: seq[NimNode];
+                         typename, enumName: NimNode;
+                         isGeneric, isRef, isPublic: bool;
+                         genericParams: NimNode
+                         ): NimNode {.compileTime.} =
   var
     obj = nnkObjConstr.newTree(typename)
     param = nnkFormalParams.newTree(typename)
@@ -72,7 +75,10 @@ proc generateConstructor(fs: seq[NimNode]; typename, enumName: NimNode;
       newEmptyNode()
     )
   return nnkProcDef.newTree(
-    kindName,
+    if isPublic: nnkPostfix.newTree(
+        ident"*",
+        kindName
+      ) else: kindName,
     newEmptyNode(),
     if isGeneric: genericParams else: newEmptyNode(),
     param,
@@ -81,8 +87,11 @@ proc generateConstructor(fs: seq[NimNode]; typename, enumName: NimNode;
     nnkStmtList.newTree(obj)
   )
 
-proc generateFunctions(typename, enumName: NimNode; xs: seq[seq[NimNode]];
-    isGeneric: bool; genericParams: NimNode): NimNode {.compileTime.} =
+proc generateFunctions(typename, enumName: NimNode;
+                       xs: seq[seq[NimNode]];
+                       isGeneric, isRef, isPublic: bool;
+                       genericParams: NimNode
+                       ): NimNode {.compileTime.} =
   let
     dollar = nnkAccQuoted.newTree(ident"$")
     equal = nnkAccQuoted.newTree(ident"==")
@@ -101,8 +110,9 @@ proc generateFunctions(typename, enumName: NimNode; xs: seq[seq[NimNode]];
       quote do: return `m`
     )
   let
+    val = if isRef: nnkBracketExpr.newTree(ident"val") else: ident"val"
     dollarBody = quote do:
-      for x, y in val.fieldPairs:
+      for x, y in `val`.fieldPairs:
         when x == "kind":
           result = $y & "("
         else:
@@ -118,7 +128,10 @@ proc generateFunctions(typename, enumName: NimNode; xs: seq[seq[NimNode]];
         return false
   return nnkStmtList.newTree(
     nnkProcDef.newTree(
-      dollar,
+      if isPublic: nnkPostfix.newTree(
+          ident"*",
+          dollar
+        ) else: dollar,
       newEmptyNode(),
       if isGeneric: genericParams else: newEmptyNode(),
       nnkFormalParams.newTree(
@@ -134,7 +147,10 @@ proc generateFunctions(typename, enumName: NimNode; xs: seq[seq[NimNode]];
       dollarBody
     ),
     nnkProcDef.newTree(
-      equal,
+      if isPublic: nnkPostfix.newTree(
+          ident"*",
+          equal
+        ) else: equal,
       newEmptyNode(),
       if isGeneric: genericParams else: newEmptyNode(),
       nnkFormalParams.newTree(
@@ -152,8 +168,11 @@ proc generateFunctions(typename, enumName: NimNode; xs: seq[seq[NimNode]];
     )
   )
 
-proc generateMatcher(xs: seq[seq[NimNode]]; enumName: NimNode;
-    typeStr: string): NimNode {.compileTime.} =
+proc generateMatcher(xs: seq[seq[NimNode]];
+                     enumName: NimNode;
+                     typeStr: string;
+                     isRef, isPublic: bool
+                     ): NimNode {.compileTime.} =
   let
     left = genSym(nskParam, "left")
     right = genSym(nskParam, "right")
@@ -176,15 +195,14 @@ proc generateMatcher(xs: seq[seq[NimNode]]; enumName: NimNode;
       ifBody.add quote do:
         result = nnkInfix.newTree(ident"and", result, matchWrapper(
             quote do: `qleft`.`n`, `right`[`index`]))
-    # ifBody.add quote do:
-    #   return `m`
     matchBody.add quote do:
       if `right`[0].strVal == `kindNameLit`:
         `ifBody`
-  # matchBody.add quote do:
-  #   echo result.repr
   return nnkMacroDef.newTree(
-    ident"customMatcher",
+    if isPublic: nnkPostfix.newTree(
+      ident"*",
+      ident"customMatcher"
+    ) else: ident"customMatcher",
     newEmptyNode(),
     newEmptyNode(),
     nnkFormalParams.newTree(
@@ -206,12 +224,11 @@ proc generateMatcher(xs: seq[seq[NimNode]]; enumName: NimNode;
   )
 
 
-macro variant*(typename, body: untyped): untyped =
+proc variantImpl(typename, body: NimNode; isRef, isPublic: bool): NimNode =
   var
     isGeneric: bool
     genericParams = nnkGenericParams.newTree(nnkIdentDefs.newTree())
     typeStr: string
-    # typename = typename
   typename.expectKind({nnkBracketExpr, nnkIdent})
   case typename.kind
   of nnkIdent:
@@ -226,7 +243,6 @@ macro variant*(typename, body: untyped): untyped =
     genericParams[0].add newEmptyNode()
     genericParams[0].add newEmptyNode()
     typeStr = typename[0].strVal
-    # typename = typename[0]
   else:
     discard
   body.expectKind(nnkStmtList)
@@ -277,19 +293,37 @@ macro variant*(typename, body: untyped): untyped =
       raise newException(ValueError, "Unexpected kind of variant body")
     xs.add fs
   result = nnkStmtList.newTree()
+  let
+    objtyBody = nnkObjectTy.newTree(
+        newEmptyNode(),
+        newEmptyNode(),
+        nnkRecList.newTree(field)
+      )
   result.add newEnum(enumName, kinds, false, true)
   result.add nnkTypeSection.newTree nnkTypeDef.newTree(
-    ident(typeStr),
+    if isPublic: nnkPostfix.newTree(
+      ident"*",
+      ident(typeStr)
+    ) else: ident(typeStr),
     if isGeneric: genericParams else: newEmptyNode(),
-    nnkObjectTy.newTree(
-      newEmptyNode(),
-      newEmptyNode(),
-      nnkRecList.newTree(field)
-    )
+    if isRef: nnkRefTy.newTree(objtyBody) else: objtyBody
   )
   for fs in xs:
-    result.add generateConstructor(fs, typename, enumName, isGeneric, genericParams)
-  result.add generateFunctions(typename, enumName, xs, isGeneric, genericParams)
-  result.add generateMatcher(xs, enumName, typeStr)
+    result.add generateConstructor(fs, typename, enumName, isGeneric, isRef,
+        isPublic, genericParams)
+  result.add generateFunctions(typename, enumName, xs, isGeneric, isRef,
+      isPublic, genericParams)
+  result.add generateMatcher(xs, enumName, typeStr, isRef, isPublic)
   result = result.copy
-  # echo result.repr
+
+macro variant*(typename, body: untyped): untyped =
+  return variantImpl(typename, body, false, false)
+
+macro variantp*(typename, body: untyped): untyped =
+  return variantImpl(typename, body, false, true)
+
+macro variantRef*(typename, body: untyped): untyped =
+  return variantImpl(typename, body, true, false)
+
+macro variantRefp*(typename, body: untyped): untyped =
+  return variantImpl(typename, body, true, true)
