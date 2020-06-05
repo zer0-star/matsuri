@@ -56,8 +56,8 @@ When you want to define your `customMatcher`, you can use the compile-time funct
 To define variant types, you can use the `variant` macro. It's similar to Patty's, but this one generates a `customMatcher` for the variant type.
 
 ```nim
-variant Maybe:
-  Just(x: int)
+variant Maybe[T]:
+  Just(x: T)
   Nothing()
 ```
 
@@ -68,21 +68,21 @@ type
   MaybeKind {.pure.} = enum
     Just, Nothing
 type
-  Maybe = object
+  Maybe[T] = object
     case kind: MaybeKind
     of MaybeKind.Just:
-      x: int
+      x: T
     of MaybeKind.Nothing:
       discard
 
 
-proc Just(x: int): Maybe =
-  result = Maybe(kind: MaybeKind.Just, x: x)
+proc Just[T](x: T): Maybe =
+  result = Maybe[T](kind: MaybeKind.Just, x: x)
 
-proc Nothing(): Maybe =
-  result = Maybe(kind: MaybeKind.Nothing)
+proc Nothing[T](): Maybe =
+  result = Maybe[T](kind: MaybeKind.Nothing)
 
-proc `$`(val: Maybe): string =
+proc `$`[T](val: Maybe[T]): string =
   result = $val.kind & "("
   case val.kind
   of MaybeKind.Just:
@@ -93,7 +93,7 @@ proc `$`(val: Maybe): string =
   else:
     result.add ')'
 
-proc `==`(lhs, rhs: Maybe): bool =
+proc `==`[T](lhs, rhs: Maybe[T]): bool =
   if lhs.kind == rhs.kind:
     case lhs.kind
     of MaybeKind.Just:
@@ -123,8 +123,8 @@ macro customMatcher(left: Maybe; right: untyped): untyped =
 The macro `customMatcher` is generated so that you can use the `match` macro with variant types.
 
 ```nim
-variant Maybe:
-  Just(x: int)
+variant Maybe[T]:
+  Just(x: T)
   Nothing()
 
 let m = Just(10)
@@ -136,27 +136,13 @@ of Nothing():
   echo "Nothing"
 ```
 
-You can also use generic variant types.
-
-```nim
-variant Maybe[T]:
-  Just(x: T)
-  Nothing()
-```
+You can export a variant type with the `variantp` macro, make it `ref object` type with the `variantRef` macro, or do both with `variantRefp` macro.
 
 ## Examples
 
 For more examples, see [examples](https://github.com/zer0-star/matsuri/tree/master/examples).
 
 ## Future Work
-
-- select object or ref object
-
-```nim
-variantRef List[T]:
-  Nil()
-  Cons(x: T, y: List[T]) # it's ok because List[T] is ref object
-```
 
 - Rust-like variant types
 
